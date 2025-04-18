@@ -19,9 +19,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 })
     }
 
-    // Create an OpenAI client
+    // Create an OpenAI client with the dangerouslyAllowBrowser option
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      dangerouslyAllowBrowser: true, // Add this option to address the error
     })
 
     console.log(

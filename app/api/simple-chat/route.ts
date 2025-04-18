@@ -4,9 +4,6 @@ import OpenAI from "openai"
 // Explicitly set the runtime for this route
 export const runtime = "nodejs"
 
-// Create an OpenAI API client (outside the handler to avoid recreating it on each request)
-let openai: OpenAI
-
 export async function POST(req: Request) {
   try {
     console.log("Simple chat API called")
@@ -17,12 +14,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "API key not configured" }, { status: 500 })
     }
 
-    // Initialize OpenAI client if not already done
-    if (!openai) {
-      openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      })
-    }
+    // Initialize OpenAI client with dangerouslyAllowBrowser option
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      dangerouslyAllowBrowser: true, // Add this option to address the error
+    })
 
     // Parse request body
     const body = await req.json()

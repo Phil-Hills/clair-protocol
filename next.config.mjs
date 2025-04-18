@@ -1,9 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['sharp'],
+    serverComponentsExternalPackages: ['sharp', '@google-cloud/aiplatform'],
   },
-  // Removing the env section that was causing the error
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -12,6 +11,11 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+  },
+  // Ensure proper server-side execution
+  serverRuntimeConfig: {
+    // Will only be available on the server side
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   },
 };
 

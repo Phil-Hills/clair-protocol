@@ -26,9 +26,10 @@ export async function GET() {
       )
     }
 
-    // Create an OpenAI client
+    // Create an OpenAI client with dangerouslyAllowBrowser option
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      dangerouslyAllowBrowser: true, // Add this option to address the error
     })
 
     // Make a simple API call

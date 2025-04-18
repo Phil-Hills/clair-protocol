@@ -4,9 +4,6 @@ import { StreamingTextResponse, OpenAIStream } from "ai"
 // Explicitly set the runtime for this route
 export const runtime = "nodejs"
 
-// Create an OpenAI API client (but don't initialize it yet)
-let openai: OpenAI
-
 export async function POST(req: Request) {
   try {
     // Extract the messages from the request
@@ -20,9 +17,10 @@ export async function POST(req: Request) {
       })
     }
 
-    // Initialize the OpenAI client with the API key
-    openai = new OpenAI({
+    // Initialize the OpenAI client with the API key and dangerouslyAllowBrowser option
+    const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      dangerouslyAllowBrowser: true, // Add this option to address the error
     })
 
     // Create the completion
