@@ -74,3 +74,25 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Button click animation */
+.btn-click-effect {
+  transform: scale(0.97);
+  transition: transform 0.1s;
+}
+
+/* Add mode form styles */
+.mode-form-input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+
+/* Mode card hover effect */
+.mode-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.mode-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}

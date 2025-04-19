@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { HomeButton } from "@/components/home-button"
 
 export default function TestApiPage() {
   const [result, setResult] = useState<any>(null)
@@ -33,6 +34,9 @@ export default function TestApiPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-4 md:p-24 bg-gradient-to-b from-slate-900 to-black text-white">
       <Card className="w-full max-w-4xl bg-black/50 backdrop-blur-sm border-slate-700 shadow-xl">
+        <div className="p-4 border-b border-slate-700">
+          <HomeButton />
+        </div>
         <CardHeader className="border-b border-slate-700">
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
             OpenAI API Test

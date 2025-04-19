@@ -10,6 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Loader2, Send, Trash2, ChevronRight, ChevronLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+// Import the HomeButton component
+import { HomeButton } from "@/components/home-button"
+
 type FluxChat = {
   id: string
   prompt: string
@@ -181,6 +184,9 @@ export default function FluxPage() {
 
       {/* Main Content */}
       <div className={cn("flex-1 p-4 md:p-8 transition-all duration-300", sidebarOpen ? "md:ml-0" : "")}>
+        <div className="flex items-center gap-2 mb-4">
+          <HomeButton variant="ghost" />
+        </div>
         <h1 className="text-3xl font-bold mb-4">🧠 Flux Image Generation</h1>
         <p className="text-gray-400 mb-6">Generate unfiltered images from text descriptions using Flux AI</p>
 

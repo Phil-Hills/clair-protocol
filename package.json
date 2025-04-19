@@ -62,7 +62,8 @@
     "@ai-sdk/openai": "latest",
     "@google-cloud/aiplatform": "latest",
     "openai": "latest",
-    "ai": "latest"
+    "ai": "latest",
+    "d3": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
