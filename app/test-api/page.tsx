@@ -3,28 +3,77 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { HomeButton } from "@/components/home-button"
 
 export default function TestApiPage() {
   const [result, setResult] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [testMessage, setTestMessage] = useState("Hello, this is a test message")
 
-  const testApi = async () => {
+  const testAgentsApi = async () => {
     setIsLoading(true)
     setError(null)
+    setResult(null)
 
     try {
-      const response = await fetch("/api/test-api")
-      const data = await response.json()
+      // Test the agents API directly
+      const response = await fetch("/agents", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: testMessage,
+        }),
+      })
 
+      // Check if response is OK
       if (!response.ok) {
-        throw new Error(data.error || "API test failed")
+        const errorText = await response.text()
+        throw new Error(`Server error: ${response.status} - ${errorText.substring(0, 100)}`)
       }
 
-      setResult(data)
+      // Try to parse the response as JSON
+      try {
+        const data = await response.json()
+        setResult(data)
+      } catch (parseError) {
+        console.error("Error parsing response:", parseError)
+
+        // Get the raw response text
+        const responseText = await response.text()
+        throw new Error(`Failed to parse response as JSON: ${responseText.substring(0, 100)}...`)
+      }
     } catch (err: any) {
       console.error("Error testing API:", err)
+      setError(err.message || "An error occurred")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const testAgentsEndpoint = async () => {
+    setIsLoading(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      // Test the agents API through the test endpoint
+      const response = await fetch("/api/test-agents")
+
+      // Check if response is OK
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Server error: ${response.status} - ${errorText.substring(0, 100)}`)
+      }
+
+      // Parse the response
+      const data = await response.json()
+      setResult(data)
+    } catch (err: any) {
+      console.error("Error testing API endpoint:", err)
       setError(err.message || "An error occurred")
     } finally {
       setIsLoading(false)
@@ -39,14 +88,32 @@ export default function TestApiPage() {
         </div>
         <CardHeader className="border-b border-slate-700">
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-            OpenAI API Test
+            API Test
           </CardTitle>
         </CardHeader>
 
         <CardContent className="p-4 space-y-4">
-          <Button onClick={testApi} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
-            {isLoading ? "Testing..." : "Test OpenAI API"}
-          </Button>
+          <div className="space-y-2">
+            <label htmlFor="test-message" className="block text-sm font-medium">
+              Test Message
+            </label>
+            <Input
+              id="test-message"
+              value={testMessage}
+              onChange={(e) => setTestMessage(e.target.value)}
+              className="bg-slate-800 border-slate-700"
+            />
+          </div>
+
+          <div className="flex space-x-4">
+            <Button onClick={testAgentsApi} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
+              {isLoading ? "Testing..." : "Test Agents API Directly"}
+            </Button>
+
+            <Button onClick={testAgentsEndpoint} disabled={isLoading} className="bg-purple-600 hover:bg-purple-700">
+              {isLoading ? "Testing..." : "Test Agents API Endpoint"}
+            </Button>
+          </div>
 
           {error && (
             <div className="p-4 bg-red-900/50 border border-red-800 rounded-md text-white">

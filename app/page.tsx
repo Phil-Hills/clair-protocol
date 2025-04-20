@@ -41,13 +41,7 @@ export default function Home() {
   })
 
   // Custom chat state
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "I am Clair. How can I assist you today, Phil?",
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,7 +49,7 @@ export default function Home() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Inside the Home component, add the toast hook
-  const { toasts, dismiss } = useToast()
+  const { toast, toasts, dismiss } = useToast()
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -91,8 +85,12 @@ export default function Home() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
+      console.log("Sending request to /agents with prompt:", input)
+
+      // Use a try-catch block specifically for the fetch operation
+      let response
       try {
-        const response = await fetch("/agents", {
+        response = await fetch("/agents", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -102,57 +100,89 @@ export default function Home() {
           }),
           signal: controller.signal,
         })
+      } catch (fetchError) {
+        console.error("Fetch operation failed:", fetchError)
+        throw new Error(`Network error: ${fetchError.message}`)
+      }
 
-        clearTimeout(timeoutId)
+      clearTimeout(timeoutId)
+      console.log("Received response:", response.status, response.statusText)
 
-        // Check if response is OK before trying to parse JSON
-        if (!response.ok) {
-          // Try to parse error as JSON, but handle text responses too
-          let errorData
-          const contentType = response.headers.get("content-type")
+      // Check if response is OK
+      if (!response.ok) {
+        // Try to get the response as text first
+        let responseText
+        try {
+          responseText = await response.text()
+          console.error("Error response text:", responseText)
+        } catch (textError) {
+          console.error("Failed to get error response text:", textError)
+          responseText = "Could not retrieve error details"
+        }
 
-          if (contentType && contentType.includes("application/json")) {
-            try {
-              errorData = await response.json()
-              throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`)
-            } catch (jsonError) {
-              throw new Error(`Server error (${response.status}): Could not parse error response`)
-            }
-          } else {
-            // Handle non-JSON responses
-            try {
-              const textError = await response.text()
-              throw new Error(`Server error (${response.status}): ${textError.substring(0, 100)}...`)
-            } catch (textError) {
-              throw new Error(`Server error: ${response.status}`)
-            }
+        // Try to parse as JSON if possible
+        let errorData
+        try {
+          errorData = JSON.parse(responseText)
+          throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`)
+        } catch (jsonError) {
+          // If it's not valid JSON, use the text directly
+          throw new Error(`Server error (${response.status}): ${responseText.substring(0, 100)}`)
+        }
+      }
+
+      // Get the response content type
+      const contentType = response.headers.get("content-type")
+      console.log("Response content type:", contentType)
+
+      // Parse response based on content type
+      let data
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          // Clone the response before parsing to avoid "body already read" errors
+          const clonedResponse = response.clone()
+          data = await clonedResponse.json()
+          console.log("Parsed JSON response:", data)
+        } catch (parseError) {
+          console.error("Error parsing JSON response:", parseError)
+
+          // Try to get the response as text
+          const responseText = await response.text()
+          console.log("Raw response:", responseText)
+
+          // Create a fallback response
+          data = {
+            response: "I received your message but couldn't process it properly.",
+            agent: {
+              id: "clair",
+              name: "Clair Core",
+            },
           }
         }
+      } else {
+        // Handle non-JSON responses
+        const responseText = await response.text()
+        console.log("Non-JSON response:", responseText)
 
-        // Parse JSON response
-        let data
-        try {
-          data = await response.json()
-        } catch (parseError) {
-          console.error("Error parsing response:", parseError)
-          throw new Error("Failed to parse server response")
+        // Create a fallback response
+        data = {
+          response: "I received your message but the server returned an unexpected response format.",
+          agent: {
+            id: "clair",
+            name: "Clair Core",
+          },
         }
-
-        // Add assistant message
-        const assistantMessage: Message = {
-          id: Date.now().toString(),
-          role: "assistant",
-          content: data.response || "I received your message but couldn't generate a proper response.",
-          agentId: data.agent?.id,
-        }
-
-        setMessages((prev) => [...prev, assistantMessage])
-      } catch (fetchError) {
-        if (fetchError.name === "AbortError") {
-          throw new Error("Request timed out. Please try again.")
-        }
-        throw fetchError
       }
+
+      // Add assistant message
+      const assistantMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: data.response || "I received your message but couldn't generate a proper response.",
+        agentId: data.agent?.id,
+      }
+
+      setMessages((prev) => [...prev, assistantMessage])
     } catch (err: any) {
       console.error("Error sending message:", err)
 
@@ -160,11 +190,19 @@ export default function Home() {
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: "assistant",
-        content: `Error: ${err.message || "An unknown error occurred"}. Please try again.`,
+        content: "I'm having trouble processing your request right now. Please try again later.",
       }
 
       setMessages((prev) => [...prev, errorMessage])
-      setError(err.message || "An error occurred while communicating with Clair")
+
+      // Show toast notification
+      toast({
+        title: "Connection Error",
+        description: err.message || "There was a problem connecting to the server.",
+        variant: "destructive",
+      })
+
+      setError("Connection error. Please try again later.")
     } finally {
       setIsLoading(false)
     }
@@ -238,22 +276,30 @@ export default function Home() {
                   </Alert>
                 )}
                 <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "flex items-start gap-3 p-3 rounded-lg",
-                        message.role === "user" ? "bg-slate-800" : "bg-slate-900",
-                      )}
-                    >
-                      <Avatar className={cn("w-8 h-8", message.role === "user" ? "bg-blue-600" : "bg-purple-600")}>
-                        <span className="text-xs font-bold">
-                          {message.role === "user" ? "PH" : getAgentIcon(message.agentId)}
-                        </span>
-                      </Avatar>
-                      <div className="text-sm">{message.content}</div>
+                  {messages.length === 0 && !isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-[50vh] text-slate-500">
+                      <Brain className="h-12 w-12 mb-4 opacity-50" />
+                      <p className="text-center">Start a conversation with Clair</p>
+                      <p className="text-sm text-center mt-2">Type a message below to begin</p>
                     </div>
-                  ))}
+                  ) : (
+                    messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={cn(
+                          "flex items-start gap-3 p-3 rounded-lg",
+                          message.role === "user" ? "bg-slate-800" : "bg-slate-900",
+                        )}
+                      >
+                        <Avatar className={cn("w-8 h-8", message.role === "user" ? "bg-blue-600" : "bg-purple-600")}>
+                          <span className="text-xs font-bold">
+                            {message.role === "user" ? "PH" : getAgentIcon(message.agentId)}
+                          </span>
+                        </Avatar>
+                        <div className="text-sm">{message.content}</div>
+                      </div>
+                    ))
+                  )}
                   {isLoading && (
                     <div className="flex items-center justify-center p-4">
                       <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
