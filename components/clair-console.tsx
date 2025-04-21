@@ -3,23 +3,16 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Save, Search, Menu, X, User, Bot, Brain, Database, ImageIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
+import { Send, Save, Search, Menu, X, User, Bot, Brain } from "lucide-react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/hooks/use-toast"
-import { ToastContainer } from "@/components/ui/toast"
 
 // Define message type
 type Message = {
   id: string
   content: string
-  sender: "user" | "assistant" | "system"
+  type: "user" | "system" | "assistant"
   timestamp: Date
-  role?: "user" | "assistant" | "system"
-  agentId?: string
 }
 
 interface ClairConsoleProps {
@@ -27,7 +20,7 @@ interface ClairConsoleProps {
   className?: string
 }
 
-export function ClairConsole({ initialMessages, className }: ClairConsoleProps) {
+export function ClairConsole({ initialMessages, className = "" }: ClairConsoleProps) {
   const [ctpProfile, setCtpProfile] = useLocalStorage("ctp-profile", {
     identity: "",
     voiceRules: "",
@@ -39,9 +32,9 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
   const [messages, setMessages] = useState<Message[]>(
     initialMessages || [
       {
-        id: "1",
+        id: "welcome",
         content: "Welcome to ClairOS. How can I assist you today?",
-        sender: "assistant",
+        type: "assistant",
         timestamp: new Date(),
       },
     ],
@@ -49,7 +42,7 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -71,7 +64,8 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
     setupErrorHandling()
   }, [])
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
 
@@ -79,48 +73,29 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
     const userMessage: Message = {
       id: Date.now().toString(),
       content: input,
-      sender: "user",
+      type: "user",
       timestamp: new Date(),
     }
 
     setMessages((prev) => [...prev, userMessage])
-
-    // Simulate assistant response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `I received your message: "${input}"`,
-        sender: "assistant",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, assistantMessage])
-    }, 1000)
-
     setInput("")
   }
 
-  // Updated to make a POST request to the save endpoint
+  // Handle saving to memory
   const handleSaveToMemory = async () => {
     if (!input.trim()) {
       // Add a system message if no input
       const systemMessage: Message = {
         id: Date.now().toString(),
         content: "Please enter text to save to memory.",
-        sender: "system",
+        type: "system",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, systemMessage])
       return
     }
 
-    // Add user action message
-    const userActionMessage: Message = {
-      id: Date.now().toString(),
-      content: `Saving to memory: "${input}"`,
-      sender: "user",
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userActionMessage])
+    setIsLoading(true)
 
     try {
       // Make POST request to save endpoint
@@ -138,7 +113,7 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
       const systemResponseMessage: Message = {
         id: Date.now().toString(),
         content: data.message || "Memory saved successfully.",
-        sender: "system",
+        type: "system",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, systemResponseMessage])
@@ -149,38 +124,33 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
       const errorMessage: Message = {
         id: Date.now().toString(),
         content: "Error saving to memory. Please try again.",
-        sender: "system",
+        type: "system",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
     }
 
     // Clear input after saving
     setInput("")
   }
 
-  // Updated to make a POST request to the query endpoint
+  // Handle querying memory
   const handleQueryMemory = async () => {
     if (!input.trim()) {
       // Add a system message if no input
       const systemMessage: Message = {
         id: Date.now().toString(),
         content: "Please enter a keyword to query memory.",
-        sender: "system",
+        type: "system",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, systemMessage])
       return
     }
 
-    // Add user action message
-    const userActionMessage: Message = {
-      id: Date.now().toString(),
-      content: `Querying memory for: "${input}"`,
-      sender: "user",
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userActionMessage])
+    setIsLoading(true)
 
     try {
       // Make POST request to query endpoint
@@ -210,7 +180,7 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
       const systemResponseMessage: Message = {
         id: Date.now().toString(),
         content: resultContent,
-        sender: "system",
+        type: "system",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, systemResponseMessage])
@@ -221,201 +191,39 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
       const errorMessage: Message = {
         id: Date.now().toString(),
         content: "Error querying memory. Please try again.",
-        sender: "system",
+        type: "system",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
     }
 
     // Clear input after querying
     setInput("")
   }
 
+  // Format timestamp
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
-  // Handle form submission with improved error handling
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!input.trim()) return
-
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: input,
-      sender: "user",
-      timestamp: new Date(),
-      role: "user",
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      // Send request to our agent API with timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-
-      console.log("Sending request to /agents with prompt:", input)
-
-      // Use a try-catch block specifically for the fetch operation
-      let response
-      try {
-        response = await fetch("/agents", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt: input,
-          }),
-          signal: controller.signal,
-        })
-      } catch (fetchError) {
-        console.error("Fetch operation failed:", fetchError)
-        throw new Error(`Network error: ${fetchError.message}`)
-      }
-
-      clearTimeout(timeoutId)
-      console.log("Received response:", response.status, response.statusText)
-
-      // Check if response is OK
-      if (!response.ok) {
-        // Try to get the response as text first
-        let responseText
-        try {
-          responseText = await response.text()
-          console.error("Error response text:", responseText)
-        } catch (textError) {
-          console.error("Failed to get error response text:", textError)
-          responseText = "Could not retrieve error details"
-        }
-
-        // Try to parse as JSON if possible
-        let errorData
-        try {
-          errorData = JSON.parse(responseText)
-          throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`)
-        } catch (jsonError) {
-          // If it's not valid JSON, use the text directly
-          throw new Error(`Server error (${response.status}): ${responseText.substring(0, 100)}`)
-        }
-      }
-
-      // Get the response content type
-      const contentType = response.headers.get("content-type")
-      console.log("Response content type:", contentType)
-
-      // Parse response based on content type
-      let data
-      if (contentType && contentType.includes("application/json")) {
-        try {
-          // Clone the response before parsing to avoid "body already read" errors
-          const clonedResponse = response.clone()
-          data = await clonedResponse.json()
-          console.log("Parsed JSON response:", data)
-        } catch (parseError) {
-          console.error("Error parsing JSON response:", parseError)
-
-          // Try to get the response as text
-          const responseText = await response.text()
-          console.log("Raw response:", responseText)
-
-          // Create a fallback response
-          data = {
-            response: "I received your message but couldn't process it properly.",
-            agent: {
-              id: "clair",
-              name: "Clair Core",
-            },
-          }
-        }
-      } else {
-        // Handle non-JSON responses
-        const responseText = await response.text()
-        console.log("Non-JSON response:", responseText)
-
-        // Create a fallback response
-        data = {
-          response: "I received your message but the server returned an unexpected response format.",
-          agent: {
-            id: "clair",
-            name: "Clair Core",
-          },
-        }
-      }
-
-      // Add assistant message
-      const assistantMessage: Message = {
-        id: Date.now().toString(),
-        content: data.response || "I received your message but couldn't generate a proper response.",
-        agentId: data.agent?.id,
-        sender: "assistant",
-        timestamp: new Date(),
-        role: "assistant",
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
-    } catch (err: any) {
-      console.error("Error sending message:", err)
-
-      // Add error message to the chat
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        content: "I'm having trouble processing your request right now. Please try again later.",
-        sender: "assistant",
-        timestamp: new Date(),
-        role: "assistant",
-      }
-
-      setMessages((prev) => [...prev, errorMessage])
-
-      // Show toast notification
-      toast({
-        title: "Connection Error",
-        description: err.message || "There was a problem connecting to the server.",
-        variant: "destructive",
-      })
-
-      setError("Connection error. Please try again later.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Get agent icon
-  const getAgentIcon = (agentId?: string) => {
-    switch (agentId) {
-      case "flux":
-        return <ImageIcon className="h-4 w-4" />
-      case "memory":
-        return <Database className="h-4 w-4" />
-      case "clair":
-      default:
-        return <Brain className="h-4 w-4" />
-    }
-  }
-
   return (
-    <div className={cn("flex h-screen bg-gray-950 text-gray-100", className)}>
+    <div className="flex h-screen bg-gray-950 text-gray-100">
       {/* Mobile sidebar toggle */}
       <button
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-800 rounded-md"
         onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
       >
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       {/* Sidebar */}
       <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-gray-900 border-r border-gray-800 transition-transform duration-300 lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
-        )}
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-gray-900 border-r border-gray-800 transition-transform duration-300 lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <div className="p-4 border-b border-gray-800">
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
@@ -425,134 +233,155 @@ export function ClairConsole({ initialMessages, className }: ClairConsoleProps) 
         </div>
 
         <nav className="p-4 space-y-2">
-          <a href="#" className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-800 transition-colors">
-            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-              <User size={16} className="text-blue-400" />
-            </div>
-            <span>Dashboard</span>
-          </a>
           <a href="#" className="flex items-center gap-2 p-2 rounded-md bg-gray-800 transition-colors">
             <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
               <Bot size={16} className="text-purple-400" />
             </div>
-            <span>Chat Console</span>
+            <span>Console</span>
+          </a>
+          <a href="#" className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-800 transition-colors">
+            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <Brain size={16} className="text-blue-400" />
+            </div>
+            <span>Agents</span>
           </a>
           <a href="#" className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-800 transition-colors">
             <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-              <Save size={16} className="text-green-400" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-green-400"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
             </div>
-            <span>Memory Bank</span>
+            <span>Settings</span>
           </a>
         </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
-              <span className="text-xs font-medium">PH</span>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Phil Hills</p>
-              <p className="text-xs text-gray-500">System Admin</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Main content */}
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", sidebarOpen ? "lg:ml-64" : "ml-0")}>
+      <div className="flex-1 flex flex-col lg:ml-64 transition-all duration-300">
         {/* Chat header */}
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-medium">Chat Console</h2>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+            <button
               onClick={handleSaveToMemory}
+              disabled={isLoading}
+              className="px-3 py-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-md hover:bg-purple-500/20 transition-colors text-sm font-medium flex items-center"
+              aria-label="Save to Memory"
             >
               <Save size={16} className="mr-2" />
               Save to Memory
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20"
+            </button>
+            <button
               onClick={handleQueryMemory}
+              disabled={isLoading}
+              className="px-3 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md hover:bg-blue-500/20 transition-colors text-sm font-medium flex items-center"
+              aria-label="Query Memory"
             >
               <Search size={16} className="mr-2" />
               Query Memory
-            </Button>
+            </button>
           </div>
         </header>
 
         {/* Chat messages */}
-        <ScrollArea className="flex-1 p-4">
+        <div className="flex-1 overflow-auto p-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
           <div className="space-y-4 pb-4">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={cn(
-                  "flex items-start gap-3 max-w-3xl message-animation",
-                  message.sender === "user" ? "ml-auto" : message.sender === "system" ? "mx-auto" : "mr-auto",
-                )}
+                className={`flex items-start gap-3 max-w-3xl animate-fadeIn ${
+                  message.type === "user" ? "ml-auto" : message.type === "system" ? "mx-auto" : "mr-auto"
+                }`}
               >
-                <div
-                  className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-                    message.sender === "user"
-                      ? "bg-blue-500/20 order-2"
-                      : message.sender === "system"
-                        ? "bg-green-500/20 order-1"
-                        : "bg-purple-500/20 order-1",
-                  )}
-                >
-                  {message.sender === "user" ? (
-                    <User size={16} className="text-blue-400" />
-                  ) : message.sender === "system" ? (
-                    <Database size={16} className="text-green-400" />
-                  ) : (
-                    <Bot size={16} className="text-purple-400" />
-                  )}
-                </div>
+                {message.type !== "user" && (
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      message.type === "system" ? "bg-green-500/20" : "bg-purple-500/20"
+                    }`}
+                  >
+                    {message.type === "system" ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-green-400"
+                      >
+                        <ellipse cx="12" cy="5" rx="9" ry="3" />
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                      </svg>
+                    ) : (
+                      <Brain size={16} className="text-purple-400" />
+                    )}
+                  </div>
+                )}
 
                 <div
-                  className={cn(
-                    "rounded-lg p-3 text-sm",
-                    message.sender === "user"
-                      ? "bg-blue-500/10 border border-blue-500/20 order-1"
-                      : message.sender === "system"
-                        ? "bg-green-500/10 border border-green-500/20 order-2 w-full"
-                        : "bg-gray-800 border border-gray-700 order-2",
-                  )}
+                  className={`rounded-lg p-3 text-sm ${
+                    message.type === "user"
+                      ? "bg-blue-500/10 border border-blue-500/20"
+                      : message.type === "system"
+                        ? "bg-green-500/10 border border-green-500/20"
+                        : "bg-gray-800 border border-gray-700"
+                  }`}
                 >
                   <div className="mb-1 whitespace-pre-wrap">{message.content}</div>
                   <div className="text-xs text-gray-500 text-right">{formatTime(message.timestamp)}</div>
                 </div>
+
+                {message.type === "user" && (
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <User size={16} className="text-blue-400" />
+                  </div>
+                )}
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Chat input */}
         <div className="p-4 border-t border-gray-800">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <Input
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <input
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 bg-gray-800 border-gray-700 focus-visible:ring-purple-500"
+              placeholder="Type something..."
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+              disabled={isLoading}
+              aria-label="Message input"
             />
-            <Button type="submit">
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Send message"
+            >
               <Send size={16} className="mr-2" />
               Send
-            </Button>
+            </button>
           </form>
         </div>
       </div>
-
-      {/* Toast container for notifications */}
-      {toasts.length > 0 && <ToastContainer toasts={toasts} onDismiss={dismiss} />}
     </div>
   )
 }
